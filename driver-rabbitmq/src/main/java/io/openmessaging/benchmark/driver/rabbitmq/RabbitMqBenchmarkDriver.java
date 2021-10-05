@@ -45,39 +45,6 @@ import org.apache.bookkeeper.stats.StatsLogger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-// Based on the KeyDistributor from the framework
-// Generates routing keys to "channel" messages to specific queues
-// Common to all producers for a workload
-class RoutingKeyGenerator {
-    private AtomicInteger idx = new AtomicInteger(0);
-    private final int KEY_COUNT;
-    private final String[] keys;
-
-    RoutingKeyGenerator(int partitions, int keyLength) {
-        KEY_COUNT = partitions;
-        keys = new String[KEY_COUNT];
-
-        // byte[] buffer = new byte[keyLength];
-        // Random random = new Random();
-        // for (int i = 0; i < keys.length; i++) {
-        // random.nextBytes(buffer);
-        // keys[i] = BaseEncoding.base64Url().omitPadding().encode(buffer);
-        // }
-
-        // Repeatable routing keys - Partition Number as string
-        // When run on workers hosted on different physical machines/processes
-        // consumers need to listen to the same routing keys as producers
-        // TODO: Pass list of routing keys along w/ topics to consumer
-        for (int i = 0; i < partitions; i++) {
-            keys[i] = String.valueOf(i);
-        }
-    }
-
-    public String next() {
-        return keys[idx.getAndIncrement() % KEY_COUNT];
-    }
-}
-
 class ConnectionManager {
     private List<ConnectionFactory> connectionFactory = new ArrayList<>();
     private List<Connection> connections = new ArrayList<>();
@@ -90,6 +57,7 @@ class ConnectionManager {
             factory.setHost(broker);
             factory.setUsername("admin");
             factory.setPassword("admin");
+            factory.setAutomaticRecoveryEnabled(true);
             connectionFactory.add(factory);
         }
     }
@@ -129,10 +97,6 @@ public class RabbitMqBenchmarkDriver implements BenchmarkDriver {
 
     private ConnectionManager connectionManager;
 
-    private Map<String, RoutingKeyGenerator> topicRoutingKeyGenerator = new HashMap<>();
-
-    private int routingKeyLength;
-
     private static final Logger log = LoggerFactory.getLogger(RabbitMqBenchmarkDriver.class);
 
     public static final String TIMESTAMP_HEADER = "timestamp";
@@ -141,7 +105,6 @@ public class RabbitMqBenchmarkDriver implements BenchmarkDriver {
     public void initialize(File configurationFile, StatsLogger statsLogger) throws IOException {
         config = mapper.readValue(configurationFile, RabbitMqConfig.class);
         connectionManager = new ConnectionManager(config.brokers);
-        routingKeyLength = config.routingKeyLength;
     }
 
     @Override
@@ -167,17 +130,11 @@ public class RabbitMqBenchmarkDriver implements BenchmarkDriver {
             future.completeExceptionally(e);
         }
 
-        if (!topicRoutingKeyGenerator.containsKey(topic)) {
-            topicRoutingKeyGenerator.put(topic, new RoutingKeyGenerator(partitions, routingKeyLength));
-        }
         return CompletableFuture.completedFuture(null);
     }
 
     @Override
     public CompletableFuture<Void> notifyTopicCreation(String topic, int partitions) {
-        if (!topicRoutingKeyGenerator.containsKey(topic)) {
-            topicRoutingKeyGenerator.put(topic, new RoutingKeyGenerator(partitions, routingKeyLength));
-        }
         return CompletableFuture.completedFuture(null);
     }
 
@@ -189,8 +146,7 @@ public class RabbitMqBenchmarkDriver implements BenchmarkDriver {
             Connection connection = config.singleNode ? connectionManager.connect(0) : connectionManager.connectAny();
             Channel channel = connection.createChannel();
             channel.confirmSelect();
-            future = CompletableFuture.completedFuture(new RabbitMqBenchmarkProducer(channel, topic,
-                    config.messagePersistence, topicRoutingKeyGenerator.get(topic)));
+            future = CompletableFuture.completedFuture(new RabbitMqBenchmarkProducer(channel, topic, config.messagePersistence));
         } catch (IOException | TimeoutException | IllegalArgumentException e) {
             e.printStackTrace();
             future.completeExceptionally(e);
@@ -223,7 +179,7 @@ public class RabbitMqBenchmarkDriver implements BenchmarkDriver {
                     }
                     queueName += ("-part-" + routingKey);
                 }
-                channel.queueDeclare(queueName, config.messagePersistence, config.exclusive, false, args);
+                channel.queueDeclare(queueName, config.messagePersistence, config.exclusive, true, args);
                 channel.queueBind(queueName, topic, routingKey);
                 log.info("Bound queue -> {} to exchange -> {}", queueName, topic);
                 future.complete(new RabbitMqBenchmarkConsumer(channel, queueName, consumerCallback));

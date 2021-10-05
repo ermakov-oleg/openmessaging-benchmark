@@ -38,8 +38,8 @@ public class RabbitMqBenchmarkConsumer extends DefaultConsumer implements Benchm
 
         this.channel = channel;
         this.callback = callback;
-        // channel.basicQos(300);
-        channel.basicConsume(queueName, true, this);
+        channel.basicQos(10);
+        channel.basicConsume(queueName, false, this);
     }
 
     @Override
@@ -49,6 +49,8 @@ public class RabbitMqBenchmarkConsumer extends DefaultConsumer implements Benchm
         long nanoTime = (Long) properties.getHeaders().getOrDefault(RabbitMqBenchmarkDriver.TIMESTAMP_HEADER,
                 Long.MAX_VALUE);
         callback.messageReceived(body, nanoTime);
+        long deliveryTag = envelope.getDeliveryTag();
+        channel.basicAck(deliveryTag, false);
     }
 
     @Override
