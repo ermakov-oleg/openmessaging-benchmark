@@ -30,6 +30,7 @@ import com.rabbitmq.client.Channel;
 
 import io.openmessaging.benchmark.driver.BenchmarkProducer;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import com.google.common.io.BaseEncoding;
@@ -43,11 +44,13 @@ public class RabbitMqBenchmarkProducer implements BenchmarkProducer {
     volatile SortedSet<Long> ackSet = Collections.synchronizedSortedSet(new TreeSet<Long>());
     private final ConcurrentHashMap<Long, CompletableFuture<Void>> futureConcurrentHashMap = new ConcurrentHashMap<>();
     private boolean messagePersistence = false;
+    private Semaphore semaphore;
 
-    public RabbitMqBenchmarkProducer(Channel channel, String exchange, boolean messagePersistence) throws IOException {
+    public RabbitMqBenchmarkProducer(Channel channel, String exchange, boolean messagePersistence, Integer maxInFlight) throws IOException {
         this.channel = channel;
         this.exchange = exchange;
         this.messagePersistence = messagePersistence;
+        this.semaphore = new Semaphore(maxInFlight);
         this.listener = new ConfirmListener() {
             @Override
             public void handleNack(long deliveryTag, boolean multiple) throws IOException {
@@ -61,6 +64,7 @@ public class RabbitMqBenchmarkProducer implements BenchmarkProducer {
                             if (future != null) {
                                 future.completeExceptionally(null);
                                 futureConcurrentHashMap.remove(value);
+                                semaphore.release();
                             }
                         }
                         treeHeadSet.clear();
@@ -71,6 +75,7 @@ public class RabbitMqBenchmarkProducer implements BenchmarkProducer {
                     if (future != null) {
                         future.completeExceptionally(null);
                         futureConcurrentHashMap.remove(deliveryTag);
+                        semaphore.release();
                     }
                     ackSet.remove(deliveryTag);
                 }
@@ -86,6 +91,7 @@ public class RabbitMqBenchmarkProducer implements BenchmarkProducer {
                             if (future != null) {
                                 future.complete(null);
                                 futureConcurrentHashMap.remove(value);
+                                semaphore.release();
                             }
                         }
                         treeHeadSet.clear();
@@ -95,6 +101,7 @@ public class RabbitMqBenchmarkProducer implements BenchmarkProducer {
                     if (future != null) {
                         future.complete(null);
                         futureConcurrentHashMap.remove(deliveryTag);
+                        semaphore.release();
                     }
                     ackSet.remove(deliveryTag);
                 }
@@ -125,6 +132,12 @@ public class RabbitMqBenchmarkProducer implements BenchmarkProducer {
         }
         BasicProperties props = builder.build();
         CompletableFuture<Void> future = new CompletableFuture<>();
+        try {
+            semaphore.acquire();
+        } catch (InterruptedException e) {
+            future.completeExceptionally(e);
+            return future;
+        }
         long msgId = channel.getNextPublishSeqNo();
         ackSet.add(msgId);
         futureConcurrentHashMap.putIfAbsent(msgId, future);

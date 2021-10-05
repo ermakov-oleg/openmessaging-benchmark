@@ -146,7 +146,7 @@ public class RabbitMqBenchmarkDriver implements BenchmarkDriver {
             Connection connection = config.singleNode ? connectionManager.connect(0) : connectionManager.connectAny();
             Channel channel = connection.createChannel();
             channel.confirmSelect();
-            future = CompletableFuture.completedFuture(new RabbitMqBenchmarkProducer(channel, topic, config.messagePersistence));
+            future = CompletableFuture.completedFuture(new RabbitMqBenchmarkProducer(channel, topic, config.messagePersistence, config.maxInFlight));
         } catch (IOException | TimeoutException | IllegalArgumentException e) {
             e.printStackTrace();
             future.completeExceptionally(e);

@@ -21,7 +21,8 @@ name: RabbitMq
 driverClass: io.openmessaging.benchmark.driver.rabbitmq.RabbitMqBenchmarkDriver
 
 brokers:
-  - 127.0.0.1
+  - localhost
+
 
 #brokers:
 #  - ermakov-test-kafka-ig1-wgqf

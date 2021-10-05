@@ -27,6 +27,7 @@ public class RabbitMqConfig {
 
     public String[] brokers;
     public boolean messagePersistence = false;
+    public Integer maxInFlight = 20;
     public QueueType queueType = QueueType.CLASSIC;
     public String topicPrefix = "test-topic";
     public BuiltinExchangeType exchangeType = BuiltinExchangeType.DIRECT;
