@@ -25,7 +25,7 @@ messageSize: 1024
 payloadFile: "payload/payload-1Kb.data"
 subscriptionsPerTopic: 20
 consumerPerSubscription: 1
-producersPerTopic: 50
+producersPerTopic: 15
 producerRate: 1000000
 consumerBacklogSizeGB: 0
 testDurationMinutes: 10

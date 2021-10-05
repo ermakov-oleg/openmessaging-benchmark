@@ -20,14 +20,13 @@
 name: RabbitMq
 driverClass: io.openmessaging.benchmark.driver.rabbitmq.RabbitMqBenchmarkDriver
 
-brokers:
-  - localhost
-
-
 #brokers:
-#  - ermakov-test-kafka-ig1-wgqf
-#  - ermakov-test-kafka-ig1-6jfc
-#  - ermakov-test-kafka-ig1-3lv9
+#  - localhost
+
+brokers:
+  - ermakov-test-kafka-ig1-wgqf
+  - ermakov-test-kafka-ig1-6jfc
+  - ermakov-test-kafka-ig1-3lv9
 
 exchangeType: "TOPIC"
 messagePersistence: true
