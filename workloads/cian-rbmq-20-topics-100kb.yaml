@@ -19,13 +19,13 @@
 
 name: 2 producer / 4 consumers on 1 topic / 100Kb payload
 
-topics: 1
+topics: 20
 partitionsPerTopic: 1
 messageSize: 102400
 payloadFile: "payload/payload-100Kb.data"
-subscriptionsPerTopic: 20
-consumerPerSubscription: 5
-producersPerTopic: 20
-producerRate: 10000
+subscriptionsPerTopic: 1
+consumerPerSubscription: 10
+producersPerTopic: 10
+producerRate: 100000
 consumerBacklogSizeGB: 0
 testDurationMinutes: 10
