@@ -179,7 +179,8 @@ public class RabbitMqBenchmarkDriver implements BenchmarkDriver {
                     }
                     queueName += ("-part-" + routingKey);
                 }
-                channel.queueDeclare(queueName, config.messagePersistence, config.exclusive, true, args);
+                boolean autoDelete = config.queueType != QueueType.QUORUM;
+                channel.queueDeclare(queueName, config.messagePersistence, config.exclusive, autoDelete, args);
                 channel.queueBind(queueName, topic, routingKey);
                 log.info("Bound queue -> {} to exchange -> {}", queueName, topic);
                 future.complete(new RabbitMqBenchmarkConsumer(channel, queueName, consumerCallback));
